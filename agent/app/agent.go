@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/api/types/container"
+	"os"
 	"time"
 
 	"github.com/aws/amazon-ecs-agent/agent/engine/execcmd"
@@ -230,6 +232,43 @@ func (agent *ecsAgent) start() int {
 	return agent.doStart(containerChangeEventStream, credentialsManager, state, imageManager, client, execcmd.NewManager())
 }
 
+func (agent *ecsAgent) startHealthContainer() error {
+	// Load health container image
+	healthContainerImagePath := "/images/amazon-ecs-health.tar"
+	healthContainerReader, err := os.Open(healthContainerImagePath)
+	if err != nil {
+		seelog.Errorf("health container load: failed to read container image: %v", err)
+		return err
+	}
+	if err := agent.dockerClient.LoadImage(agent.ctx, healthContainerReader, dockerclient.LoadImageTimeout); err != nil {
+		seelog.Errorf("health container load: failed to load container image: %v", err)
+		return err
+	}
+
+	// Inspect health container image
+	healthContainerImageName := "amazon/amazon-ecs-health:0.1.0"
+	image, err := agent.dockerClient.InspectImage(healthContainerImageName)
+	if err != nil {
+		seelog.Errorf("health container load: failed to inspect image: %s", healthContainerImageName)
+		return err
+	}
+
+	// Create and start health container
+	seelog.Infof("health container image ID: %s", image.ID)
+	resp := agent.dockerClient.CreateContainer(agent.ctx, &container.Config{Image: healthContainerImageName}, nil, "", time.Minute)
+	if resp.Error != nil {
+		seelog.Errorf("health container creation: failed to create container: %v", resp.Error)
+		return resp.Error
+	}
+
+	resp = agent.dockerClient.StartContainer(agent.ctx, resp.DockerID, time.Minute)
+	if resp.Error != nil {
+		seelog.Errorf("health container start: failed to start container: %v", resp.Error)
+	}
+
+	return resp.Error
+}
+
 // doStart is the worker invoked by start for starting the ECS Agent. This involves
 // initializing the docker task engine, state saver, image manager, credentials
 // manager, poll and telemetry sessions, api handler etc
@@ -267,6 +306,11 @@ func (agent *ecsAgent) doStart(containerChangeEventStream *eventstream.EventStre
 		return exitcodes.ExitTerminal
 	}
 	agent.initMetricsEngine()
+
+	err = agent.startHealthContainer()
+	if err != nil {
+		seelog.Errorf("error starting health container: %+v", err)
+	}
 
 	loadPauseErr := agent.loadPauseContainer()
 	if loadPauseErr != nil {
