@@ -13,7 +13,7 @@
 
 USERID=$(shell id -u)
 
-.PHONY: all gobuild static xplatform-build docker release certs test clean netkitten test-registry benchmark-test gogenerate run-integ-tests pause-container get-cni-sources cni-plugins test-artifacts
+.PHONY: all gobuild static xplatform-build docker release certs test clean netkitten test-registry benchmark-test gogenerate run-integ-tests pause-container health-container-release get-cni-sources cni-plugins test-artifacts
 BUILD_PLATFORM:=$(shell uname -m)
 
 ifeq (${BUILD_PLATFORM},aarch64)
@@ -72,7 +72,7 @@ build-in-docker: .builder-image-stamp .out-stamp
 
 # 'docker' builds the agent dockerfile from the current sourcecode tree, dirty
 # or not
-docker: certs build-in-docker pause-container-release cni-plugins .out-stamp
+docker: certs build-in-docker pause-container-release health-container-release cni-plugins .out-stamp
 	@cd scripts && ./create-amazon-ecs-scratch
 	@docker build -f scripts/dockerfiles/Dockerfile.release -t "amazon/amazon-ecs-agent:make" .
 	@echo "Built Docker image \"amazon/amazon-ecs-agent:make\""
@@ -86,7 +86,7 @@ endif
 # 'docker-release' builds the agent from a clean snapshot of the git repo in
 # 'RELEASE' mode
 # TODO: make this idempotent
-docker-release: pause-container-release cni-plugins .out-stamp
+docker-release: pause-container-release health-container-release cni-plugins .out-stamp
 	@docker build --build-arg GO_VERSION=${GO_VERSION} -f scripts/dockerfiles/Dockerfile.cleanbuild -t "amazon/amazon-ecs-agent-${BUILD}:make" .
 	@docker run --net=none \
 		--env TARGET_OS="${TARGET_OS}" \
@@ -173,6 +173,17 @@ pause-container: .out-stamp
 
 pause-container-release: pause-container
 	@docker save ${PAUSE_CONTAINER_IMAGE}:${PAUSE_CONTAINER_TAG} > "$(PWD)/out/${PAUSE_CONTAINER_TARBALL}"
+
+
+HEALTH_CONTAINER_IMAGE = "amazon/amazon-ecs-health"
+HEALTH_CONTAINER_TAG = "0.1.0"
+HEALTH_CONTAINER_TARBALL = "amazon-ecs-health.tar"
+
+health-container: .out-stamp
+	$(MAKE) -C misc/health-container $(MFLAGS)
+
+health-container-release: health-container
+	@docker save ${HEALTH_CONTAINER_IMAGE}:${HEALTH_CONTAINER_TAG} > "$(PWD)/out/${HEALTH_CONTAINER_TARBALL}"
 
 # Variable to determine branch/tag of amazon-ecs-cni-plugins
 ECS_CNI_REPOSITORY_REVISION=master
