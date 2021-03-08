@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/containerd/containerd/namespaces"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -23,6 +24,17 @@ type containerRuntimeHealth struct {
 
 func main() {
 	ctx := context.Background()
+
+	//// check init status
+	//cmd := "systemctl status ecs | grep PID"
+	//fmt.Printf("about to execute bash command  %s\n", cmd)
+	//
+	//out, err := exec.Command("bash", "-c", cmd).Output()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//fmt.Printf("systemctl output is %s\n", out)
+
 	dockerCli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		panic(err)
@@ -55,7 +67,10 @@ func main() {
 		containerdHealth := containerRuntimeHealth{
 			runtimeType: "containerd",
 		}
-		_, err = containerdCli.ListImages(ctx)
+		// Because the client calls containerd's gRPC API to interact with the daemon,
+		// all API calls require a context with a namespace set.
+		containerdCtx := namespaces.WithNamespace(ctx, "moby")
+		_, err = containerdCli.ListImages(containerdCtx)
 		if err != nil {
 			containerdHealth.status = "impaired"
 			containerdHealth.message = fmt.Sprintf("containerd health check failed: %+v", err)
