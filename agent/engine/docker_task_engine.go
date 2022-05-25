@@ -1257,6 +1257,7 @@ func (engine *DockerTaskEngine) createContainer(task *apitask.Task, container *a
 	}
 
 	// Add Service Connect modifications if needed
+	// TODO [SC] let task SC manager handle container docker config and docker host config
 	if task.IsServiceConnectEnabled() {
 		err := engine.serviceconnectManager.AugmentTaskContainer(task, container, hostConfig)
 		if err != nil {

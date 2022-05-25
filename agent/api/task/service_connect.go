@@ -13,6 +13,12 @@
 
 package task
 
+import (
+	apicontainer "github.com/aws/amazon-ecs-agent/agent/api/container"
+	"github.com/aws/amazon-ecs-agent/agent/config"
+	dockercontainer "github.com/docker/docker/api/types/container"
+)
+
 // ServiceConnectConfig represents the Service Connect configuration for a task.
 type ServiceConnectConfig struct {
 	ContainerName string               `json:"containerName"`
@@ -71,4 +77,11 @@ type VIP struct {
 type DNSConfigEntry struct {
 	HostName string `json:"hostName"`
 	Address  string `json:"address"`
+}
+
+type ServiceConnectManager interface {
+	InitTaskResourcesPostUnmarshal(task *Task) error
+	AddNetworkResourceProvisioningDependencyBridgeMode(task *Task, cfg *config.Config) error
+	AugmentTaskContainerHostConfig(task *Task, container *apicontainer.Container, hostConfig *dockercontainer.HostConfig) error
+	AugmentTaskContainerDockerConfig(task *Task, container *apicontainer.Container, dockerConfig *dockercontainer.Config) error
 }
