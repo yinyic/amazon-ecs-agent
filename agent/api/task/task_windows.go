@@ -1,4 +1,5 @@
 //go:build windows
+// +build windows
 
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 //
@@ -123,7 +124,10 @@ func (task *Task) dockerCPUShares(containerCPU uint) int64 {
 }
 
 func (task *Task) initializeCgroupResourceSpec(cgroupPath string, cGroupCPUPeriod time.Duration, resourceFields *taskresource.ResourceFields) error {
-	return errors.New("unsupported platform")
+	if task.MemoryCPULimitsEnabled {
+		return errors.New("unsupported platform")
+	}
+	return nil
 }
 
 // requiresCredentialSpecResource returns true if at least one container in the task

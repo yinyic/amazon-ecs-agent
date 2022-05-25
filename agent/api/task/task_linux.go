@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 //
@@ -58,21 +59,23 @@ func (task *Task) adjustForPlatform(cfg *config.Config) {
 }
 
 func (task *Task) initializeCgroupResourceSpec(cgroupPath string, cGroupCPUPeriod time.Duration, resourceFields *taskresource.ResourceFields) error {
-	cgroupRoot, err := task.BuildCgroupRoot()
-	if err != nil {
-		return errors.Wrapf(err, "cgroup resource: unable to determine cgroup root for task")
-	}
-	resSpec, err := task.BuildLinuxResourceSpec(cGroupCPUPeriod)
-	if err != nil {
-		return errors.Wrapf(err, "cgroup resource: unable to build resource spec for task")
-	}
-	cgroupResource := cgroup.NewCgroupResource(task.Arn, resourceFields.Control,
-		resourceFields.IOUtil, cgroupRoot, cgroupPath, resSpec)
-	task.AddResource(resourcetype.CgroupKey, cgroupResource)
-	for _, container := range task.Containers {
-		container.BuildResourceDependency(cgroupResource.GetName(),
-			resourcestatus.ResourceStatus(cgroup.CgroupCreated),
-			apicontainerstatus.ContainerPulled)
+	if task.MemoryCPULimitsEnabled {
+		cgroupRoot, err := task.BuildCgroupRoot()
+		if err != nil {
+			return errors.Wrapf(err, "cgroup resource: unable to determine cgroup root for task")
+		}
+		resSpec, err := task.BuildLinuxResourceSpec(cGroupCPUPeriod)
+		if err != nil {
+			return errors.Wrapf(err, "cgroup resource: unable to build resource spec for task")
+		}
+		cgroupResource := cgroup.NewCgroupResource(task.Arn, resourceFields.Control,
+			resourceFields.IOUtil, cgroupRoot, cgroupPath, resSpec)
+		task.AddResource(resourcetype.CgroupKey, cgroupResource)
+		for _, container := range task.Containers {
+			container.BuildResourceDependency(cgroupResource.GetName(),
+				resourcestatus.ResourceStatus(cgroup.CgroupCreated),
+				apicontainerstatus.ContainerPulled)
+		}
 	}
 	return nil
 }

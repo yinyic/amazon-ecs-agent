@@ -32,9 +32,13 @@ const (
 	// Expected to have task.GetID() appended to form actual host path
 	defaultStatusPathHostRoot = "/var/run/ecs/service_connect/"
 	defaultStatusFileName     = "appnet_admin.sock"
-	defaultStatusENV          = "APPNET_AGENT_UDS_PATH"
-	defaultAdminStatsRequest  = "/stats/prometheus?usedonly&filter=metrics_extension&delta"
-	defaultAdminDrainRequest  = "/drain_listeners?inboundonly"
+	defaultStatusENV          = "APPNET_AGENT_ADMIN_UDS_PATH"
+
+	defaultAdminStatsRequest = "/stats/prometheus?usedonly&filter=metrics_extension&delta"
+	defaultAdminDrainRequest = "/drain_listeners?inboundonly"
+
+	agentModeENV   = "APPNET_AGENT_ADMIN_MODE"
+	agentModeValue = "uds"
 )
 
 type manager struct {
@@ -125,8 +129,9 @@ func (m *manager) initAgentDirectoryMounts(taskId string, container *apicontaine
 
 func (m *manager) initAgentEnvironment(container *apicontainer.Container) {
 	scEnv := map[string]string{
-		m.relayENV:  filepath.Join(m.relayPathContainer, m.relayFileName),
-		m.statusENV: filepath.Join(m.statusPathContainer, m.statusFileName),
+		m.relayENV:   filepath.Join(m.relayPathContainer, m.relayFileName),
+		m.statusENV:  filepath.Join(m.statusPathContainer, m.statusFileName),
+		agentModeENV: agentModeValue,
 	}
 
 	container.MergeEnvironmentVariables(scEnv)
