@@ -79,7 +79,7 @@ func (cl *client) GetStats(config serviceconnect.RuntimeConfig) (map[string]*pro
 // This function expects an Appnet-agent-hosted HTTP server listening on the UDS path passed in config.
 func (cl *client) DrainInboundConnections(config serviceconnect.RuntimeConfig) error {
 	return retry.RetryNWithBackoff(oneSecondBackoffNoJitter, 3, func() error {
-		resp, err := performAppnetRequest(http.MethodGet, config.AdminSocketPath, config.DrainRequest)
+		resp, err := performAppnetRequest(http.MethodPost, config.AdminSocketPath, config.DrainRequest)
 		if err != nil {
 			logger.Warn("Error invoking Appnet's DrainInboundConnections", logger.Fields{
 				"adminSocketPath": config.AdminSocketPath,

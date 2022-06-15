@@ -101,7 +101,7 @@ func setupTestUdsServer(t *testing.T, rawResponse string) *httptest.Server {
 		fmt.Fprintf(w, "%s", rawResponse)
 	})
 	r.HandleFunc("/drain/connections", func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, http.MethodPost, r.Method)
 		assert.True(t, r.URL.Query().Has("all_of_them"))
 		assert.Equal(t, "value", r.URL.Query().Get("key"))
 		fmt.Fprintf(w, "%s", rawResponse)
