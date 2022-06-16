@@ -48,6 +48,8 @@ const (
 	eniSubnetGatewayIPV4AddressWithoutBlockSize = "172.31.1.1"
 	trunkENIMACAddress                          = "02:7b:64:49:b2:40"
 	branchENIVLANID                             = "42"
+	testIngressListenerPort                     = uint16(11111)
+	testEgressConfigListenerPort                = uint16(22222)
 )
 
 func TestSetupNS(t *testing.T) {
@@ -287,11 +289,11 @@ func defaultTestServiceConnectConfig() *serviceconnect.Config {
 	return &serviceconnect.Config{
 		IngressConfig: []serviceconnect.IngressConfigEntry{{
 			ListenerName: "test ingress listener",
-			ListenerPort: 11111,
+			ListenerPort: testIngressListenerPort,
 		}},
 		EgressConfig: &serviceconnect.EgressConfig{
 			ListenerName: "test egress listener",
-			ListenerPort: 22222,
+			ListenerPort: testEgressConfigListenerPort,
 			VIP: serviceconnect.VIP{
 				IPV4CIDR: "169.254.0.0/16",
 			},
@@ -657,10 +659,10 @@ func TestConstructServiceConnectNetworkConfig(t *testing.T) {
 	err = json.Unmarshal(netConfig.Bytes, &scNetworkConfig)
 	assert.NoError(t, err, "unmarshal ServiceConnect network config")
 	assert.Equal(t, 1, len(scNetworkConfig.IngressConfig))
-	assert.Equal(t, uint16(11111), scNetworkConfig.IngressConfig[0].ListenerPort)
+	assert.Equal(t, testIngressListenerPort, scNetworkConfig.IngressConfig[0].ListenerPort)
 	assert.Equal(t, uint16(0), scNetworkConfig.IngressConfig[0].InterceptPort)
 	assert.NotNil(t, scNetworkConfig.EgressConfig)
-	assert.Equal(t, uint16(22222), scNetworkConfig.EgressConfig.ListenerPort)
+	assert.Equal(t, testEgressConfigListenerPort, scNetworkConfig.EgressConfig.ListenerPort)
 	assert.Equal(t, "169.254.0.0/16", scNetworkConfig.EgressConfig.VIP.IPv4CIDR)
 	assert.Equal(t, "", scNetworkConfig.EgressConfig.VIP.IPv6CIDR)
 	assert.Equal(t, true, scNetworkConfig.EnableIPv4)
@@ -678,7 +680,7 @@ func TestConstructServiceConnectNetworkConfig_EmptyEgress(t *testing.T) {
 	err = json.Unmarshal(netConfig.Bytes, &scNetworkConfig)
 	assert.NoError(t, err, "unmarshal ServiceConnect network config")
 	assert.Equal(t, 1, len(scNetworkConfig.IngressConfig))
-	assert.Equal(t, uint16(11111), scNetworkConfig.IngressConfig[0].ListenerPort)
+	assert.Equal(t, testIngressListenerPort, scNetworkConfig.IngressConfig[0].ListenerPort)
 	assert.Equal(t, uint16(0), scNetworkConfig.IngressConfig[0].InterceptPort)
 	assert.Nil(t, scNetworkConfig.EgressConfig)
 	assert.Equal(t, true, scNetworkConfig.EnableIPv4)
@@ -701,12 +703,12 @@ func TestConstructServiceConnectNetworkConfig_MultipleIngress(t *testing.T) {
 	err = json.Unmarshal(netConfig.Bytes, &scNetworkConfig)
 	assert.NoError(t, err, "unmarshal ServiceConnect network config")
 	assert.Equal(t, 2, len(scNetworkConfig.IngressConfig))
-	assert.Equal(t, uint16(11111), scNetworkConfig.IngressConfig[0].ListenerPort)
+	assert.Equal(t, testIngressListenerPort, scNetworkConfig.IngressConfig[0].ListenerPort)
 	assert.Equal(t, uint16(0), scNetworkConfig.IngressConfig[0].InterceptPort)
 	assert.Equal(t, uint16(33333), scNetworkConfig.IngressConfig[1].ListenerPort)
 	assert.Equal(t, uint16(44444), scNetworkConfig.IngressConfig[1].InterceptPort)
 	assert.NotNil(t, scNetworkConfig.EgressConfig)
-	assert.Equal(t, uint16(22222), scNetworkConfig.EgressConfig.ListenerPort)
+	assert.Equal(t, testEgressConfigListenerPort, scNetworkConfig.EgressConfig.ListenerPort)
 	assert.Equal(t, "169.254.0.0/16", scNetworkConfig.EgressConfig.VIP.IPv4CIDR)
 	assert.Equal(t, "", scNetworkConfig.EgressConfig.VIP.IPv6CIDR)
 	assert.Equal(t, true, scNetworkConfig.EnableIPv4)
@@ -725,7 +727,7 @@ func TestConstructServiceConnectNetworkConfig_EmptyIngress(t *testing.T) {
 	assert.NoError(t, err, "unmarshal ServiceConnect network config")
 	assert.Equal(t, 0, len(scNetworkConfig.IngressConfig))
 	assert.NotNil(t, scNetworkConfig.EgressConfig)
-	assert.Equal(t, uint16(22222), scNetworkConfig.EgressConfig.ListenerPort)
+	assert.Equal(t, testEgressConfigListenerPort, scNetworkConfig.EgressConfig.ListenerPort)
 	assert.Equal(t, "169.254.0.0/16", scNetworkConfig.EgressConfig.VIP.IPv4CIDR)
 	assert.Equal(t, "", scNetworkConfig.EgressConfig.VIP.IPv6CIDR)
 	assert.Equal(t, true, scNetworkConfig.EnableIPv4)
