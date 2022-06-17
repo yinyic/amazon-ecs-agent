@@ -63,20 +63,27 @@ func (client *cniClient) setupNS(ctx context.Context, cfg *Config) (*current.Res
 		runtimeConfig.IfName = networkConfig.IfName
 		result, err := client.libcni.AddNetwork(ctx, cniNetworkConfig, &runtimeConfig)
 		if err != nil {
-			return nil, errors.Wrap(err, "add network failed")
+			return nil, errors.Wrap(err, "[ECSCNI] Add network failed")
+		} else {
+			seelog.Debugf("[ECSCNI] Add network succeeded yoho with result %s", result.String())
 		}
 		// Save the result object from the bridge plugin execution. We need this later
 		// for inferring what IPv4 address was used to bring up the veth pair for task.
+		seelog.Debugf("[ECSCNI] Checkpoint 1")
 		if cniNetworkConfig.Network.Type == ECSBridgePluginName {
+			seelog.Debugf("[ECSCNI] Checkpoint 2")
 			bridgeResult = result
 		}
-
+		seelog.Debugf("[ECSCNI] Checkpoint 3")
 		seelog.Debugf("[ECSCNI] Completed adding network %s type %s in the container namespace %s",
 			cniNetworkConfig.Network.Name,
 			cniNetworkConfig.Network.Type,
 			cfg.ContainerID)
 	}
 
+	if bridgeResult == nil {
+		return nil, nil // in bridge mode we won't need the result
+	}
 	seelog.Debugf("[ECSCNI] Completed setting up the container namespace: %s", bridgeResult.String())
 
 	if _, err := bridgeResult.GetAsVersion(currentCNISpec); err != nil {

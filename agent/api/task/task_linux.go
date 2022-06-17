@@ -278,9 +278,9 @@ func (task *Task) initializeFSxWindowsFileServerResource(cfg *config.Config, cre
 	return errors.New("task with FSx for Windows File Server volumes is only supported on Windows container instance")
 }
 
-// BuildCNIConfig builds a list of CNI network configurations for the task.
+// BuildCNIConfigAwsvpc builds a list of CNI network configurations for the task.
 // If includeIPAMConfig is set to true, the list also includes the bridge IPAM configuration.
-func (task *Task) BuildCNIConfig(includeIPAMConfig bool, cniConfig *ecscni.Config) (*ecscni.Config, error) {
+func (task *Task) BuildCNIConfigAwsvpc(includeIPAMConfig bool, cniConfig *ecscni.Config) (*ecscni.Config, error) {
 	if !task.IsNetworkModeAWSVPC() {
 		return nil, errors.New("task config: task network mode is not AWSVPC")
 	}
@@ -343,6 +343,7 @@ func (task *Task) BuildCNIConfig(includeIPAMConfig bool, cniConfig *ecscni.Confi
 	if task.IsServiceConnectEnabled() {
 		ifName, netconf, err = ecscni.NewServiceConnectNetworkConfig(
 			task.ServiceConnectConfig,
+			ecscni.RedirectConfig{RedirectMode: ecscni.NAT},
 			task.shouldEnableIPv4(),
 			task.shouldEnableIPv6(),
 			cniConfig)
@@ -356,6 +357,37 @@ func (task *Task) BuildCNIConfig(includeIPAMConfig bool, cniConfig *ecscni.Confi
 	}
 
 	cniConfig.ContainerNetNS = fmt.Sprintf(ecscni.NetnsFormat, cniConfig.ContainerPID)
+
+	return cniConfig, nil
+}
+
+// BuildCNIConfigBridgeMode builds a list of CNI network configurations for the task.
+// TODO [SC] consolidate it with awsvpc mode building SC plugin
+func (task *Task) BuildCNIConfigBridgeMode(cniConfig *ecscni.Config, redirectIp string) (*ecscni.Config, error) {
+	if !task.IsNetworkModeBridge() {
+		return nil, errors.New("task is not bridge mode - should not invoke BuildCNIConfigBridgeMode")
+	}
+
+	var netconf *libcni.NetworkConfig
+	var ifName string
+	var err error
+
+	// Build a CNI network configuration for ServiceConnect-enabled task in AWSVPC mode
+	if task.IsServiceConnectEnabled() {
+		ifName, netconf, err = ecscni.NewServiceConnectNetworkConfig(
+			task.ServiceConnectConfig,
+			ecscni.RedirectConfig{RedirectMode: ecscni.TPROXY, RedirectIp: redirectIp},
+			task.shouldEnableIPv4(),
+			task.shouldEnableIPv6(),
+			cniConfig)
+		if err != nil {
+			return nil, err
+		}
+		cniConfig.NetworkConfigs = append(cniConfig.NetworkConfigs, &ecscni.NetworkConfig{
+			IfName:           ifName,
+			CNINetworkConfig: netconf,
+		})
+	}
 
 	return cniConfig, nil
 }

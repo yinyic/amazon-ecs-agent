@@ -1515,21 +1515,29 @@ func (task *Task) addNetworkResourceProvisioningDependencyServiceConnectBridge(c
 		}
 	}
 
-	// All other task pause container RESOURCES_PROVISIONED depends on SC pause container RUNNING because task pause container
-	// CNI plugin invocation needs the IP of SC pause container (to send SC traffic to)
+	//// All other task pause container RESOURCES_PROVISIONED depends on SC pause container RUNNING because task pause container
+	//// CNI plugin invocation needs the IP of SC pause container (to send SC traffic to)
+	//for _, container := range task.Containers {
+	//	if container.Type != apicontainer.ContainerCNIPause || container == scPauseContainer {
+	//		continue
+	//	}
+	//	container.BuildContainerDependency(scPauseContainer.Name, apicontainerstatus.ContainerRunning, apicontainerstatus.ContainerResourcesProvisioned)
+	//}
+
+	// TODO [SC] - remove me
 	for _, container := range task.Containers {
 		if container.Type != apicontainer.ContainerCNIPause || container == scPauseContainer {
 			continue
 		}
-		container.BuildContainerDependency(scPauseContainer.Name, apicontainerstatus.ContainerRunning, apicontainerstatus.ContainerResourcesProvisioned)
+		container.BuildContainerDependency(scPauseContainer.Name, apicontainerstatus.ContainerResourcesProvisioned, apicontainerstatus.ContainerResourcesProvisioned)
 	}
 	return nil
 }
 
-// getBridgeModePauseContainerForTaskContainer retrieves the associated pause container for a task container (SC container
+// GetBridgeModePauseContainerForTaskContainer retrieves the associated pause container for a task container (SC container
 // or customer-defined containers) in a bridge-mode SC-enabled task.
 // For a container with name "abc", the pause container will always be named "~internal~ecs~pause-abc"
-func (task *Task) getBridgeModePauseContainerForTaskContainer(container *apicontainer.Container) (*apicontainer.Container, error) {
+func (task *Task) GetBridgeModePauseContainerForTaskContainer(container *apicontainer.Container) (*apicontainer.Container, error) {
 	// "~internal~ecs~pause-$TASK_CONTAINER_NAME"
 	pauseContainerName := fmt.Sprintf("%s-%s", NetworkPauseContainerName, container.Name)
 	pauseContainer, ok := task.ContainerByName(pauseContainerName)
@@ -1539,9 +1547,9 @@ func (task *Task) getBridgeModePauseContainerForTaskContainer(container *apicont
 	return pauseContainer, nil
 }
 
-// getBridgeModeTaskContainerForPauseContainer retrieves the associated task container for a pause container in a bridge-mode SC-enabled task.
+// GetBridgeModeTaskContainerForPauseContainer retrieves the associated task container for a pause container in a bridge-mode SC-enabled task.
 // For a container with name "abc", the pause container will always be named "~internal~ecs~pause-abc"
-func (task *Task) getBridgeModeTaskContainerForPauseContainer(container *apicontainer.Container) (*apicontainer.Container, error) {
+func (task *Task) GetBridgeModeTaskContainerForPauseContainer(container *apicontainer.Container) (*apicontainer.Container, error) {
 	if container.Type != apicontainer.ContainerCNIPause {
 		return nil, fmt.Errorf("container %s is not a CNI pause container", container.Name)
 	}
@@ -1779,7 +1787,7 @@ func (task *Task) dockerExposedPorts(container *apicontainer.Container) (dockerE
 		if container.Type == apicontainer.ContainerCNIPause {
 			// find the task container associated with this particular pause container, and let pause container
 			// expose the application container port
-			containerToCheck, err = task.getBridgeModeTaskContainerForPauseContainer(container)
+			containerToCheck, err = task.GetBridgeModeTaskContainerForPauseContainer(container)
 			if err != nil {
 				return nil, err
 			}
@@ -2037,7 +2045,7 @@ func (task *Task) shouldOverrideNetworkModeAwsvpc(container *apicontainer.Contai
 // with container network mode use pause container netns (the "docker run" equivalent option is
 // "--network container:$pause_container_id")
 func (task *Task) shouldOverrideNetworkModeServiceConnectBridge(container *apicontainer.Container, dockerContainerMap map[string]*apicontainer.DockerContainer) (bool, string) {
-	pauseContainer, err := task.getBridgeModePauseContainerForTaskContainer(container)
+	pauseContainer, err := task.GetBridgeModePauseContainerForTaskContainer(container)
 	if err != nil {
 		// This should never be the case and implies a code-bug.
 		logger.Critical("Pause container required per task container for Service Connect task bridge mode, but "+
@@ -2118,7 +2126,11 @@ func (task *Task) generateENIExtraHosts() []string {
 	return extraHosts
 }
 
+// TODO [SC] - how to let this handle bridge mode?
 func (task *Task) shouldEnableIPv4() bool {
+	if task.IsNetworkModeBridge() {
+		return true
+	}
 	eni := task.GetPrimaryENI()
 	if eni == nil {
 		return false
@@ -2324,7 +2336,7 @@ func (task *Task) dockerPortMap(container *apicontainer.Container) (nat.PortMap,
 			// and let them be published by the associated pause container.
 			// Note - for SC bridge mode we do not allow customer to specify a host port for their containers. Additionally,
 			// When an ephemeral host port is assigned, Appnet will NOT proxy traffic to that port
-			taskContainer, err := task.getBridgeModeTaskContainerForPauseContainer(container)
+			taskContainer, err := task.GetBridgeModeTaskContainerForPauseContainer(container)
 			if err != nil {
 				return nil, err
 			}
@@ -3222,7 +3234,7 @@ func (task *Task) PopulateServiceConnectContainerMappingEnvVar() error {
 		if c.Type != apicontainer.ContainerCNIPause {
 			continue
 		}
-		taskContainer, err := task.getBridgeModeTaskContainerForPauseContainer(c)
+		taskContainer, err := task.GetBridgeModeTaskContainerForPauseContainer(c)
 		if err != nil {
 			return fmt.Errorf("error retrieving task container for pause container %s: %+v", c.Name, err)
 		}

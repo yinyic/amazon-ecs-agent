@@ -175,6 +175,7 @@ func NewAppMeshConfig(appMesh *appmesh.AppMesh, cfg *Config) (string, *libcni.Ne
 // NewServiceConnectNetworkConfig creates a new ServiceConnect CNI network configuration
 func NewServiceConnectNetworkConfig(
 	scConfig *serviceconnect.Config,
+	redirectConfig RedirectConfig,
 	enableIPv4, enableIPv6 bool,
 	cfg *Config) (string, *libcni.NetworkConfig, error) {
 	var ingressConfig []IngressConfigJSONEntry
@@ -191,11 +192,26 @@ func NewServiceConnectNetworkConfig(
 	var egressConfig *EgressConfigJSON
 	if scConfig.EgressConfig != nil {
 		egressConfig = &EgressConfigJSON{
-			ListenerPort: scConfig.EgressConfig.ListenerPort,
+			RedirectMode: string(redirectConfig.RedirectMode),
 			VIP: VIPConfigJSON{
 				IPv4CIDR: scConfig.EgressConfig.VIP.IPV4CIDR,
 				IPv6CIDR: scConfig.EgressConfig.VIP.IPV6CIDR,
 			},
+		}
+		switch redirectConfig.RedirectMode {
+		case NAT: // awsvpc
+			// pass egress listener port
+			egressConfig.ListenerPort = scConfig.EgressConfig.ListenerPort
+		case TPROXY: // bridge
+			if redirectConfig.RedirectIp != "" {
+				// for application pause container, pass redirectIP
+				egressConfig.RedirectIP = redirectConfig.RedirectIp
+			} else {
+				// for sc pause container, pass egress listener port for setting up tproxy
+				egressConfig.ListenerPort = scConfig.EgressConfig.ListenerPort
+			}
+		default:
+
 		}
 	}
 

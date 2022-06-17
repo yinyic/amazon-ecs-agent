@@ -279,7 +279,7 @@ func TestSetupNSServiceConnectEnabled(t *testing.T) {
 }
 
 func serviceConnectNetworkConfig(config *Config) *NetworkConfig {
-	_, serviceConnectNetworkConfig, _ := NewServiceConnectNetworkConfig(defaultTestServiceConnectConfig(), true, false, config)
+	_, serviceConnectNetworkConfig, _ := NewServiceConnectNetworkConfig(defaultTestServiceConnectConfig(), RedirectConfig{RedirectMode: NAT}, true, false, config)
 	return &NetworkConfig{CNINetworkConfig: serviceConnectNetworkConfig}
 }
 
@@ -649,7 +649,7 @@ func TestConstructIPAMNetworkConfig(t *testing.T) {
 
 func TestConstructServiceConnectNetworkConfig(t *testing.T) {
 	config := defaultTestServiceConnectConfig()
-	scIfName, netConfig, err := NewServiceConnectNetworkConfig(config, true, false, &Config{})
+	scIfName, netConfig, err := NewServiceConnectNetworkConfig(config, RedirectConfig{RedirectMode: NAT}, true, false, &Config{})
 	require.NoError(t, err, "Failed to construct service connect network config")
 	assert.Equal(t, defaultServiceConnectIfName, scIfName)
 
@@ -670,7 +670,7 @@ func TestConstructServiceConnectNetworkConfig(t *testing.T) {
 func TestConstructServiceConnectNetworkConfig_EmptyEgress(t *testing.T) {
 	config := defaultTestServiceConnectConfig()
 	config.EgressConfig = nil
-	scIfName, netConfig, err := NewServiceConnectNetworkConfig(config, true, true, &Config{})
+	scIfName, netConfig, err := NewServiceConnectNetworkConfig(config, RedirectConfig{RedirectMode: NAT}, true, true, &Config{})
 	require.NoError(t, err, "Failed to construct service connect network config")
 	assert.Equal(t, defaultServiceConnectIfName, scIfName)
 
@@ -693,7 +693,7 @@ func TestConstructServiceConnectNetworkConfig_MultipleIngress(t *testing.T) {
 		ListenerPort:  uint16(33333),
 		InterceptPort: &interceptPort,
 	})
-	scIfName, netConfig, err := NewServiceConnectNetworkConfig(config, true, true, &Config{})
+	scIfName, netConfig, err := NewServiceConnectNetworkConfig(config, RedirectConfig{RedirectMode: NAT}, true, true, &Config{})
 	require.NoError(t, err, "Failed to construct service connect network config")
 	assert.Equal(t, defaultServiceConnectIfName, scIfName)
 
@@ -716,7 +716,7 @@ func TestConstructServiceConnectNetworkConfig_MultipleIngress(t *testing.T) {
 func TestConstructServiceConnectNetworkConfig_EmptyIngress(t *testing.T) {
 	config := defaultTestServiceConnectConfig()
 	config.IngressConfig = []serviceconnect.IngressConfigEntry{}
-	scIfName, netConfig, err := NewServiceConnectNetworkConfig(config, true, false, &Config{})
+	scIfName, netConfig, err := NewServiceConnectNetworkConfig(config, RedirectConfig{RedirectMode: NAT}, true, false, &Config{})
 	require.NoError(t, err, "Failed to construct service connect network config")
 	assert.Equal(t, defaultServiceConnectIfName, scIfName)
 

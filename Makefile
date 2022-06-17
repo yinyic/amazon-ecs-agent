@@ -222,7 +222,8 @@ build-vpc-cni-plugins:
 		"amazon/amazon-ecs-build-vpc-cni-plugins:make"
 	@echo "Built amazon-vpc-cni-plugins successfully."
 
-cni-plugins: get-cni-sources .out-stamp build-ecs-cni-plugins build-vpc-cni-plugins
+# cni-plugins: get-cni-sources .out-stamp build-ecs-cni-plugins build-vpc-cni-plugins
+cni-plugins: .out-stamp build-ecs-cni-plugins build-vpc-cni-plugins
 	mv $(PWD)/out/amazon-ecs-cni-plugins/* $(PWD)/out/cni-plugins
 	mv $(PWD)/out/amazon-vpc-cni-plugins/* $(PWD)/out/cni-plugins
 	@echo "Built all cni plugins successfully."

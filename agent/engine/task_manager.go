@@ -754,7 +754,7 @@ func (mtask *managedTask) releaseIPInIPAM() {
 		field.TaskID: mtask.GetID(),
 	})
 
-	cfg, err := mtask.BuildCNIConfig(true, &ecscni.Config{
+	cfg, err := mtask.BuildCNIConfigAwsvpc(true, &ecscni.Config{
 		MinSupportedCNIVersion: config.DefaultMinSupportedCNIVersion,
 	})
 	if err != nil {

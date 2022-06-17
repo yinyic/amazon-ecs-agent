@@ -1259,7 +1259,7 @@ func TestBuildCNIConfigRegularENIWithAppMesh(t *testing.T) {
 					egressIgnoredIP,
 				},
 			})
-			cniConfig, err := testTask.BuildCNIConfig(true, &ecscni.Config{
+			cniConfig, err := testTask.BuildCNIConfigAwsvpc(true, &ecscni.Config{
 				BlockInstanceMetadata: blockIMDS,
 			})
 			assert.NoError(t, err)
@@ -1318,7 +1318,7 @@ func TestBuildCNIConfigTrunkBranchENI(t *testing.T) {
 				},
 			})
 
-			cniConfig, err := testTask.BuildCNIConfig(true, &ecscni.Config{
+			cniConfig, err := testTask.BuildCNIConfigAwsvpc(true, &ecscni.Config{
 				BlockInstanceMetadata: blockIMDS,
 			})
 			assert.NoError(t, err)

@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/cihub/seelog"
+
 	"github.com/aws/amazon-ecs-agent/agent/api/appnet"
 
 	serviceconnect "github.com/aws/amazon-ecs-agent/agent/engine/service_connect"
@@ -1666,6 +1668,123 @@ func (engine *DockerTaskEngine) provisionContainerResources(task *apitask.Task, 
 		field.TaskID:    task.GetID(),
 		field.Container: container.Name,
 	})
+	if task.IsNetworkModeAWSVPC() {
+		return engine.provisionContainerResourcesAwsvpc(task, container)
+	} else if task.IsNetworkModeBridge() {
+		return engine.provisionContainerResourcesBridgeMode(task, container)
+	}
+	// TODO [SC] - probably should throw? It's like no-op
+	return dockerapi.DockerContainerMetadata{}
+}
+
+func (engine *DockerTaskEngine) provisionContainerResourcesBridgeMode(task *apitask.Task, container *apicontainer.Container) dockerapi.DockerContainerMetadata {
+	// TODO [SC] should throw
+	if !task.IsServiceConnectEnabled() || container.Type != apicontainer.ContainerCNIPause {
+		return dockerapi.DockerContainerMetadata{
+			Error: ContainerNetworkingError{fromError: fmt.Errorf(
+				"container resource provisioning bridge mode: cannot setup netns - only valid for SC-enabled task pause container"),
+			},
+		}
+	}
+
+	containerInspectOutput, err := engine.inspectContainer(task, container)
+	if err != nil {
+		return dockerapi.DockerContainerMetadata{
+			Error: ContainerNetworkingError{
+				fromError: fmt.Errorf(
+					"container resource provisioning bridge mode: cannot setup netns due to error inspecting pause container"),
+			},
+		}
+	}
+
+	// TODO [SC] hmmm maybe we actually need it???
+	// task.SetPausePIDInVolumeResources(strconv.Itoa(containerInspectOutput.State.Pid))
+
+	// if this is an SC application pause container (i.e. not AppNet pause container), we need to supply the SC pause container IP to redirect egress traffic
+	scPauseContainerIP := ""
+	scContainer := task.GetServiceConnectContainer()
+	scPauseContainer, err := task.GetBridgeModePauseContainerForTaskContainer(scContainer)
+	if err != nil {
+		return dockerapi.DockerContainerMetadata{
+			Error: ContainerNetworkingError{fromError: fmt.Errorf(
+				"container resource provisioning bridge mode: cannot setup netns for %s due to error retrieving SC pause container: %+v", container.Name, err),
+			},
+		}
+	}
+
+	if container != scPauseContainer {
+		// TODO [SC] - cache it maybe
+		scPauseContainerInspectOutput, err := engine.inspectContainer(task, scPauseContainer)
+		if err != nil {
+			return dockerapi.DockerContainerMetadata{
+				Error: ContainerNetworkingError{
+					fromError: fmt.Errorf(
+						"container resource provisioning bridge mode: cannot setup netns for %s due to error inspecting AppNet pause container: %+v", container.Name, err),
+				},
+			}
+		}
+		// TODO [SC] - nil check
+		scPauseContainerIP = scPauseContainerInspectOutput.NetworkSettings.Networks["bridge"].IPAddress
+		log.Infof("Container is SC bridge mode application container - retrieved SC pause container IP %s", scPauseContainerIP)
+	}
+
+	cniConfig, err := engine.buildCNIConfigFromTaskContainerBridgeMode(task, containerInspectOutput, scPauseContainerIP)
+	if err != nil {
+		return dockerapi.DockerContainerMetadata{
+			Error: ContainerNetworkingError{
+				fromError: fmt.Errorf(
+					"container resource provisioning bridge mode: unable to build cni configuration for container %s: %+v", container.Name, err),
+			},
+		}
+	}
+
+	// Invoke the libcni to config the network namespace for the container
+	_, err = engine.cniClient.SetupNS(engine.ctx, cniConfig, cniSetupTimeout)
+	log.Infof("container resource provisioning bridge mode for %s: just invoked CNI plugin", container.Name)
+
+	if err != nil {
+		logger.Error("Unable to configure pause container namespace", logger.Fields{
+			field.TaskID: task.GetID(),
+			field.Error:  err,
+		})
+		return dockerapi.DockerContainerMetadata{
+			DockerID: cniConfig.ContainerID,
+			Error: ContainerNetworkingError{errors.Wrap(err,
+				"container resource provisioning: failed to setup network namespace")},
+		}
+	}
+
+	log.Infof("Successfully configured pause netns for %s", container.Name)
+
+	//// This is the IP of the task assigned on the bridge for IAM Task roles
+	//// TODO [SC] unsure if we need this
+	//taskIP := result.IPs[0].Address.IP.String()
+	//logger.Info("Task associated with ip address", logger.Fields{
+	//	field.TaskID: task.GetID(),
+	//	"ip":         taskIP,
+	//})
+	//engine.state.AddTaskIPAddress(taskIP, task.Arn)
+	//task.SetLocalIPAddress(taskIP)
+	//engine.saveTaskData(task)
+
+	//// Invoke additional commands required to configure the task namespace routing.
+	//err = engine.namespaceHelper.ConfigureTaskNamespaceRouting(engine.ctx, task.GetPrimaryENI(), cniConfig, result)
+	//if err != nil {
+	//	logger.Error("Unable to configure pause container namespace", logger.Fields{
+	//		field.TaskID: task.GetID(),
+	//		field.Error:  err,
+	//	})
+	//	return dockerapi.DockerContainerMetadata{
+	//		DockerID: cniConfig.ContainerID,
+	//		Error: ContainerNetworkingError{errors.Wrapf(err,
+	//			"container resource provisioning: failed to setup network namespace")},
+	//	}
+	//}
+
+	return dockerapi.MetadataFromContainer(containerInspectOutput)
+}
+
+func (engine *DockerTaskEngine) provisionContainerResourcesAwsvpc(task *apitask.Task, container *apicontainer.Container) dockerapi.DockerContainerMetadata {
 	containerInspectOutput, err := engine.inspectContainer(task, container)
 	if err != nil {
 		return dockerapi.DockerContainerMetadata{
@@ -1676,14 +1795,9 @@ func (engine *DockerTaskEngine) provisionContainerResources(task *apitask.Task, 
 		}
 	}
 
-	if task.IsServiceConnectEnabled() && task.IsNetworkModeBridge() {
-		// TODO [SC]: CNI integration for SC bridge-mode task (need branching to handle SC pause and task container pause)
-		return dockerapi.MetadataFromContainer(containerInspectOutput)
-	}
-
 	task.SetPausePIDInVolumeResources(strconv.Itoa(containerInspectOutput.State.Pid))
 
-	cniConfig, err := engine.buildCNIConfigFromTaskContainer(task, containerInspectOutput, true)
+	cniConfig, err := engine.buildCNIConfigFromTaskContainerAwsvpc(task, containerInspectOutput, true)
 	if err != nil {
 		return dockerapi.DockerContainerMetadata{
 			Error: ContainerNetworkingError{
@@ -1780,7 +1894,7 @@ func (engine *DockerTaskEngine) cleanupPauseContainerNetworkAwsvpc(task *apitask
 	logger.Info("Cleaning up the network namespace", logger.Fields{
 		field.TaskID: task.GetID(),
 	})
-	cniConfig, err := engine.buildCNIConfigFromTaskContainer(task, containerInspectOutput, false)
+	cniConfig, err := engine.buildCNIConfigFromTaskContainerAwsvpc(task, containerInspectOutput, false)
 	if err != nil {
 		return errors.Wrapf(err,
 			"engine: failed cleanup task network namespace, task: %s", task.String())
@@ -1798,8 +1912,8 @@ func (engine *DockerTaskEngine) cleanupPauseContainerNetworkAwsvpc(task *apitask
 	return nil
 }
 
-// buildCNIConfigFromTaskContainer builds a CNI config for the task and container.
-func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainer(
+// buildCNIConfigFromTaskContainerAwsvpc builds a CNI config for the task and container in AWSVPC mode.
+func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerAwsvpc(
 	task *apitask.Task,
 	containerInspectOutput *types.ContainerJSON,
 	includeIPAMConfig bool) (*ecscni.Config, error) {
@@ -1831,7 +1945,45 @@ func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainer(
 		return nil, errors.New("engine: failed to build cni configuration from the task due to invalid container network namespace")
 	}
 
-	cniConfig, err := task.BuildCNIConfig(includeIPAMConfig, cniConfig)
+	cniConfig, err := task.BuildCNIConfigAwsvpc(includeIPAMConfig, cniConfig)
+	if err != nil {
+		return nil, errors.Wrapf(err, "engine: failed to build cni configuration from task")
+	}
+
+	return cniConfig, nil
+}
+
+// buildCNIConfigFromTaskContainerBridgeMode builds a CNI config for the task and container in docker bridge mode.
+func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerBridgeMode(
+	task *apitask.Task,
+	containerInspectOutput *types.ContainerJSON,
+	redirectIp string) (*ecscni.Config, error) {
+
+	containerPid := strconv.Itoa(containerInspectOutput.State.Pid)
+
+	cniConfig := &ecscni.Config{
+		//BlockInstanceMetadata:    engine.cfg.AWSVPCBlockInstanceMetdata.Enabled(),
+		MinSupportedCNIVersion: config.DefaultMinSupportedCNIVersion,
+		//InstanceENIDNSServerList: engine.cfg.InstanceENIDNSServerList,
+		ContainerPID:   containerPid,
+		ContainerID:    containerInspectOutput.ID,
+		ID:             "0a:2e:bf:5b:7d:97", // TODO [SC] not sure if I need this
+		ContainerNetNS: fmt.Sprintf(ecscni.NetnsFormat, containerPid),
+	}
+	// TODO [SC] this is overridden later on in task.BuildCNIConfigBridgeMode
+	//cniConfig.ContainerNetNS = containerInspectOutput.HostConfig.NetworkMode.NetworkName()
+
+	//// For pause containers, NetNS would be none
+	//// For other containers, NetNS would be of format container:<pause_container_ID>
+	//if containerInspectOutput.HostConfig.NetworkMode.IsNone() {
+	//	cniConfig.ContainerNetNS = containerInspectOutput.HostConfig.NetworkMode.NetworkName()
+	//} else if containerInspectOutput.HostConfig.NetworkMode.IsContainer() {
+	//	cniConfig.ContainerNetNS = fmt.Sprintf("container:%s", containerInspectOutput.HostConfig.NetworkMode.ConnectedContainer())
+	//} else {
+	//	return nil, errors.New("engine: failed to build cni configuration from the task due to invalid container network namespace")
+	//}
+
+	cniConfig, err := task.BuildCNIConfigBridgeMode(cniConfig, redirectIp)
 	if err != nil {
 		return nil, errors.Wrapf(err, "engine: failed to build cni configuration from task")
 	}
