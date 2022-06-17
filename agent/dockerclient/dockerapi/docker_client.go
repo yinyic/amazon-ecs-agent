@@ -779,10 +779,6 @@ func (dg *dockerGoClient) containerMetadata(ctx context.Context, id string) Dock
 
 // MetadataFromContainer translates dockerContainer into DockerContainerMetadata
 func MetadataFromContainer(dockerContainer *types.ContainerJSON) DockerContainerMetadata {
-	seelog.Infof("MetadataFromContainer: translating container metadata for %s", dockerContainer.Name)
-	seelog.Infof("MetadataFromContainer: dumping docker container metadata for %s\njson base: %+v\nConfig: %+v\nNetwork settings: %+v\n",
-		dockerContainer.Name, *(dockerContainer.ContainerJSONBase), *(dockerContainer.Config), *(dockerContainer.NetworkSettings))
-
 	var bindings []apicontainer.PortBinding
 	var err apierrors.NamedError
 	if dockerContainer.NetworkSettings != nil {
@@ -811,7 +807,6 @@ func MetadataFromContainer(dockerContainer *types.ContainerJSON) DockerContainer
 		StartedAt:    startedTime,
 		FinishedAt:   finishedTime,
 	}
-	seelog.Infof("MetadataFromContainer: half way through translating container metadata for %s", dockerContainer.Name)
 
 	if dockerContainer.NetworkSettings != nil {
 		metadata.NetworkSettings = dockerContainer.NetworkSettings
@@ -838,7 +833,6 @@ func MetadataFromContainer(dockerContainer *types.ContainerJSON) DockerContainer
 	if dockerContainer.State.OOMKilled {
 		metadata.Error = OutOfMemoryError{}
 	}
-	seelog.Infof("MetadataFromContainer: almost done translating container metadata for %s, result is %+v", dockerContainer.Name, metadata)
 
 	// Health field in Docker SDK is a pointer, need to check before not nil before dereference.
 	if dockerContainer.State.Health == nil || dockerContainer.State.Health.Status == "" || dockerContainer.State.Health.Status == healthCheckStarting {
@@ -846,8 +840,6 @@ func MetadataFromContainer(dockerContainer *types.ContainerJSON) DockerContainer
 	}
 	// Record the health check information if exists
 	metadata.Health = getMetadataHealthCheck(dockerContainer)
-
-	seelog.Infof("MetadataFromContainer: done translating container metadata for %s, result is %+v", dockerContainer.Name, metadata)
 
 	return metadata
 }

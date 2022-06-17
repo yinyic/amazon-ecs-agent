@@ -2010,7 +2010,9 @@ func (engine *DockerTaskEngine) stopContainer(task *apitask.Task, container *api
 				field.Error:  err,
 			})
 		} else {
-			task.SetServiceConnectConnectionDraining(true)
+			logger.Debug("Successfully sent drain signal to Appnet Agent", logger.Fields{
+				field.TaskID: task.GetID(),
+			})
 		}
 	}
 
