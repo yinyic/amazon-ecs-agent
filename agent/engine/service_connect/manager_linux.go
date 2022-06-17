@@ -150,10 +150,10 @@ func (m *manager) initAgentDirectoryMounts(taskId string, container *apicontaine
 
 func (m *manager) initAgentEnvironment(container *apicontainer.Container) {
 	scEnv := map[string]string{
-		m.relayENV:   unixRequestPrefix + filepath.Join(m.relayPathContainer, m.relayFileName),
+		//m.relayENV:   unixRequestPrefix + filepath.Join(m.relayPathContainer, m.relayFileName),
 		m.statusENV:  filepath.Join(m.statusPathContainer, m.statusFileName),
 		agentModeENV: agentModeValue,
-		agentAuthENV: agentAuthOff,
+		//agentAuthENV: agentAuthOff,
 	}
 
 	container.MergeEnvironmentVariables(scEnv)
