@@ -1697,11 +1697,9 @@ func (engine *DockerTaskEngine) provisionContainerResourcesBridgeMode(task *apit
 		}
 	}
 
-	// TODO [SC] hmmm maybe we actually need it???
-	// task.SetPausePIDInVolumeResources(strconv.Itoa(containerInspectOutput.State.Pid))
-
 	// if this is an SC application pause container (i.e. not AppNet pause container), we need to supply the SC pause container IP to redirect egress traffic
-	scPauseContainerIP := ""
+	scPauseContainerIPv4Addr := ""
+	scPauseContainerIPv6Addr := ""
 	scContainer := task.GetServiceConnectContainer()
 	scPauseContainer, err := task.GetBridgeModePauseContainerForTaskContainer(scContainer)
 	if err != nil {
@@ -1724,11 +1722,14 @@ func (engine *DockerTaskEngine) provisionContainerResourcesBridgeMode(task *apit
 			}
 		}
 		// TODO [SC] - nil check
-		scPauseContainerIP = scPauseContainerInspectOutput.NetworkSettings.Networks["bridge"].IPAddress
-		log.Infof("Container is SC bridge mode application container - retrieved SC pause container IP %s", scPauseContainerIP)
+		scPauseContainerIPv4Addr = scPauseContainerInspectOutput.NetworkSettings.Networks["bridge"].IPAddress
+		scPauseContainerIPv6Addr = scPauseContainerInspectOutput.NetworkSettings.Networks["bridge"].GlobalIPv6Address // TODO [SC] - verify this
+
+		log.Infof("Container is SC bridge mode application container - retrieved SC pause container IPv4 addr %s and IPv6 addr %s",
+			scPauseContainerIPv4Addr, scPauseContainerIPv6Addr)
 	}
 
-	cniConfig, err := engine.buildCNIConfigFromTaskContainerBridgeMode(task, containerInspectOutput, scPauseContainerIP)
+	cniConfig, err := engine.buildCNIConfigFromTaskContainerBridgeMode(task, containerInspectOutput, scPauseContainerIPv4Addr, scPauseContainerIPv6Addr)
 	if err != nil {
 		return dockerapi.DockerContainerMetadata{
 			Error: ContainerNetworkingError{
@@ -1957,7 +1958,7 @@ func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerAwsvpc(
 func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerBridgeMode(
 	task *apitask.Task,
 	containerInspectOutput *types.ContainerJSON,
-	redirectIp string) (*ecscni.Config, error) {
+	redirectIPv4Addr, redirectIPv6Addr string) (*ecscni.Config, error) {
 
 	containerPid := strconv.Itoa(containerInspectOutput.State.Pid)
 
@@ -1967,7 +1968,6 @@ func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerBridgeMode(
 		//InstanceENIDNSServerList: engine.cfg.InstanceENIDNSServerList,
 		ContainerPID:   containerPid,
 		ContainerID:    containerInspectOutput.ID,
-		ID:             "0a:2e:bf:5b:7d:97", // TODO [SC] not sure if I need this
 		ContainerNetNS: fmt.Sprintf(ecscni.NetnsFormat, containerPid),
 	}
 	// TODO [SC] this is overridden later on in task.BuildCNIConfigBridgeMode
@@ -1983,7 +1983,7 @@ func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerBridgeMode(
 	//	return nil, errors.New("engine: failed to build cni configuration from the task due to invalid container network namespace")
 	//}
 
-	cniConfig, err := task.BuildCNIConfigBridgeMode(cniConfig, redirectIp)
+	cniConfig, err := task.BuildCNIConfigBridgeMode(cniConfig, redirectIPv4Addr, redirectIPv6Addr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "engine: failed to build cni configuration from task")
 	}

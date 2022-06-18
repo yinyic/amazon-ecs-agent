@@ -175,8 +175,7 @@ func NewAppMeshConfig(appMesh *appmesh.AppMesh, cfg *Config) (string, *libcni.Ne
 // NewServiceConnectNetworkConfig creates a new ServiceConnect CNI network configuration
 func NewServiceConnectNetworkConfig(
 	scConfig *serviceconnect.Config,
-	redirectConfig RedirectConfig,
-	enableIPv4, enableIPv6 bool,
+	scCniInternalConfig ServiceConnectInternalConfig,
 	cfg *Config) (string, *libcni.NetworkConfig, error) {
 	var ingressConfig []IngressConfigJSONEntry
 	for _, ic := range scConfig.IngressConfig {
@@ -192,20 +191,23 @@ func NewServiceConnectNetworkConfig(
 	var egressConfig *EgressConfigJSON
 	if scConfig.EgressConfig != nil {
 		egressConfig = &EgressConfigJSON{
-			RedirectMode: string(redirectConfig.RedirectMode),
+			RedirectMode: string(scCniInternalConfig.RedirectMode),
 			VIP: VIPConfigJSON{
 				IPv4CIDR: scConfig.EgressConfig.VIP.IPV4CIDR,
 				IPv6CIDR: scConfig.EgressConfig.VIP.IPV6CIDR,
 			},
 		}
-		switch redirectConfig.RedirectMode {
+		switch scCniInternalConfig.RedirectMode {
 		case NAT: // awsvpc
 			// pass egress listener port
 			egressConfig.ListenerPort = scConfig.EgressConfig.ListenerPort
 		case TPROXY: // bridge
-			if redirectConfig.RedirectIp != "" {
+			if scCniInternalConfig.IPv4RedirectAddr != "" || scCniInternalConfig.IPv6RedirectAddr != "" {
 				// for application pause container, pass redirectIP
-				egressConfig.RedirectIP = redirectConfig.RedirectIp
+				egressConfig.RedirectIP = &RedirectIPJson{
+					IPv4: scCniInternalConfig.IPv4RedirectAddr,
+					IPv6: scCniInternalConfig.IPv6RedirectAddr,
+				}
 			} else {
 				// for sc pause container, pass egress listener port for setting up tproxy
 				egressConfig.ListenerPort = scConfig.EgressConfig.ListenerPort
@@ -220,9 +222,12 @@ func NewServiceConnectNetworkConfig(
 		Type:          ECSServiceConnectPluginName,
 		IngressConfig: ingressConfig,
 		EgressConfig:  egressConfig,
-		EnableIPv4:    enableIPv4,
-		EnableIPv6:    enableIPv6,
+		EnableIPv4:    scCniInternalConfig.EnableIPv4,
+		EnableIPv6:    scCniInternalConfig.EnableIPv6,
 	}
+
+	seelog.Debugf("Built SC CNI config: %+v", scNetworkConfig)
+
 	networkConfig, err := newNetworkConfig(scNetworkConfig, ECSServiceConnectPluginName, cfg.MinSupportedCNIVersion)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "NewServiceConnectNetworkConfig: construct the service connect network configuration failed")

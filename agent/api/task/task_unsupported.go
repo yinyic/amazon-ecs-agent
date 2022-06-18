@@ -100,6 +100,6 @@ func (task *Task) BuildCNIConfigAwsvpc(includeIPAMConfig bool, cniConfig *ecscni
 }
 
 // BuildCNIConfigBridgeMode builds a list of CNI network configurations for the task.
-func (task *Task) BuildCNIConfigBridgeMode(cniConfig *ecscni.Config, redirectIp string) (*ecscni.Config, error) {
+func (task *Task) BuildCNIConfigBridgeMode(cniConfig *ecscni.Config, redirectIPv4Addr, redirectIPv6Addr string) (*ecscni.Config, error) {
 	return nil, errors.New("unsupported platform")
 }

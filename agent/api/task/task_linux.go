@@ -343,9 +343,11 @@ func (task *Task) BuildCNIConfigAwsvpc(includeIPAMConfig bool, cniConfig *ecscni
 	if task.IsServiceConnectEnabled() {
 		ifName, netconf, err = ecscni.NewServiceConnectNetworkConfig(
 			task.ServiceConnectConfig,
-			ecscni.RedirectConfig{RedirectMode: ecscni.NAT},
-			task.shouldEnableIPv4(),
-			task.shouldEnableIPv6(),
+			ecscni.ServiceConnectInternalConfig{
+				RedirectMode: ecscni.NAT,
+				EnableIPv4:   task.shouldEnableIPv4(),
+				EnableIPv6:   task.shouldEnableIPv6(),
+			},
 			cniConfig)
 		if err != nil {
 			return nil, err
@@ -363,7 +365,7 @@ func (task *Task) BuildCNIConfigAwsvpc(includeIPAMConfig bool, cniConfig *ecscni
 
 // BuildCNIConfigBridgeMode builds a list of CNI network configurations for the task.
 // TODO [SC] consolidate it with awsvpc mode building SC plugin
-func (task *Task) BuildCNIConfigBridgeMode(cniConfig *ecscni.Config, redirectIp string) (*ecscni.Config, error) {
+func (task *Task) BuildCNIConfigBridgeMode(cniConfig *ecscni.Config, redirectIPv4Addr, redirectIPv6Addr string) (*ecscni.Config, error) {
 	if !task.IsNetworkModeBridge() {
 		return nil, errors.New("task is not bridge mode - should not invoke BuildCNIConfigBridgeMode")
 	}
@@ -376,9 +378,13 @@ func (task *Task) BuildCNIConfigBridgeMode(cniConfig *ecscni.Config, redirectIp 
 	if task.IsServiceConnectEnabled() {
 		ifName, netconf, err = ecscni.NewServiceConnectNetworkConfig(
 			task.ServiceConnectConfig,
-			ecscni.RedirectConfig{RedirectMode: ecscni.TPROXY, RedirectIp: redirectIp},
-			task.shouldEnableIPv4(),
-			task.shouldEnableIPv6(),
+			ecscni.ServiceConnectInternalConfig{
+				RedirectMode:     ecscni.TPROXY,
+				EnableIPv4:       task.shouldEnableIPv4(),
+				EnableIPv6:       task.shouldEnableIPv6(),
+				IPv4RedirectAddr: redirectIPv4Addr,
+				IPv6RedirectAddr: redirectIPv6Addr,
+			},
 			cniConfig)
 		if err != nil {
 			return nil, err

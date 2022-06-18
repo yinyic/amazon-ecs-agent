@@ -197,22 +197,30 @@ const (
 	TPROXY              = "tproxy"
 )
 
-// RedirectConfig is used internally for grouping redirect IP and mode
-type RedirectConfig struct {
-	RedirectMode RedirectMode
-	RedirectIp   string
-}
-
 // EgressConfig defines the egress network config in JSON format for the ecs-serviceconnect CNI plugin.
 type EgressConfigJSON struct {
-	ListenerPort uint16        `json:"listenerPort"`
-	RedirectIP   string        `json:"redirectIP"`
-	RedirectMode string        `json:"redirectMode"`
-	VIP          VIPConfigJSON `json:"vip"`
+	ListenerPort uint16          `json:"listenerPort"`
+	RedirectIP   *RedirectIPJson `json:"redirectIP"`
+	RedirectMode string          `json:"redirectMode"`
+	VIP          VIPConfigJSON   `json:"vip"`
+}
+
+// RedirectIPJson defines the IP to be redirected in JSON format for the ecs-serviceconnect CNI plugin.
+type RedirectIPJson struct {
+	IPv4 string `json:"ipv4,omitempty"`
+	IPv6 string `json:"ipv6,omitempty"`
 }
 
 // vipConfig defines the EgressVIP network config in JSON format for the ecs-serviceconnect CNI plugin.
 type VIPConfigJSON struct {
 	IPv4CIDR string `json:"ipv4Cidr,omitempty"`
 	IPv6CIDR string `json:"ipv6Cidr,omitempty"`
+}
+
+type ServiceConnectInternalConfig struct {
+	RedirectMode     RedirectMode
+	EnableIPv4       bool
+	EnableIPv6       bool
+	IPv4RedirectAddr string
+	IPv6RedirectAddr string
 }
