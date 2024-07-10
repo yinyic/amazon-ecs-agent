@@ -430,8 +430,45 @@ func (mtask *managedTask) handleDesiredStatusChange(desiredStatus apitaskstatus.
 		return
 	}
 	mtask.SetDesiredStatus(desiredStatus)
+	logger.Debug("Going to update task desired status", logger.Fields{
+                field.TaskID:        mtask.GetID(),
+	})
+	mtask.printStatus()
 	mtask.UpdateDesiredStatus()
+	logger.Debug("Updated task desired status", logger.Fields{
+                field.TaskID:        mtask.GetID(),
+        })
+        mtask.printStatus()
 	mtask.engine.saveTaskData(mtask.Task)
+}
+
+func (mtask *managedTask) printStatus() {
+	logger.Debug("Task status", logger.Fields{
+		field.TaskID: mtask.GetID(),
+		field.KnownStatus: mtask.GetKnownStatus().String(),
+		field.DesiredStatus: mtask.GetDesiredStatus().String(),
+	})
+
+	for _, container := range mtask.Containers {
+		logger.Debug("Container status", logger.Fields{
+			field.TaskID: mtask.GetID(),
+			field.Container: container.Name,
+			field.RuntimeID: container.GetRuntimeID(),
+			field.KnownStatus: container.GetKnownStatus().String(),
+			field.DesiredStatus: container.GetDesiredStatus().String(),
+		})
+	}
+
+	for _, res := range mtask.GetResources() {
+		logger.Debug("Resource status", logger.Fields{
+			field.TaskID: mtask.GetID(),
+			field.Resource: res.GetName(),
+			field.KnownStatus: res.StatusString(knownStatus),
+			field.DesiredStatus: res.StatusString(desiredStatus),
+		})
+
+	}
+	return
 }
 
 // handleContainerChange updates a container's known status. If the message
