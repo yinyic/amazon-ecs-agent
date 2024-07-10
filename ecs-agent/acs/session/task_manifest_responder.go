@@ -16,6 +16,7 @@ package session
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/aws/amazon-ecs-agent/ecs-agent/acs/model/ecsacs"
 	"github.com/aws/amazon-ecs-agent/ecs-agent/logger"
@@ -176,6 +177,8 @@ func (tmr *taskManifestResponder) sendTaskStopVerification(message *ecsacs.TaskM
 	if len(tasksToStop) == 0 {
 		return
 	}
+        logger.Info("sleeping 30 seconds before sending TaskStopVerification message")
+        time.Sleep(30 * time.Second)
 	// Create a list of stop candidates to send one debug message.
 	var taskARNList []string
 	for _, task := range tasksToStop {

@@ -421,6 +421,8 @@ func (mtask *managedTask) handleDesiredStatusChange(desiredStatus apitaskstatus.
 		field.DesiredStatus: desiredStatus.String(),
 		field.Sequence:      seqnum,
 	})
+	logger.Info("Sleeping 45 seconds before applying acs transition")
+	time.Sleep(45 * time.Second)
 	if desiredStatus <= mtask.GetDesiredStatus() {
 		logger.Debug("Redundant task transition; ignoring", logger.Fields{
 			field.TaskID:        mtask.GetID(),
