@@ -460,6 +460,8 @@ func (mtask *managedTask) printStatus() {
 	}
 
 	for _, res := range mtask.GetResources() {
+		knownStatus := res.GetKnownStatus()
+		desiredStatus := res.GetDesiredStatus()
 		logger.Debug("Resource status", logger.Fields{
 			field.TaskID: mtask.GetID(),
 			field.Resource: res.GetName(),
@@ -1066,8 +1068,16 @@ func (mtask *managedTask) progressTask() {
 		})
 
 	atLeastOneTransitionStarted := anyResourceTransition || anyContainerTransition
-
 	blockedByOrderingDependencies := len(blockedDependencies) > 0
+	logger.Debug("transition check results (
+		anyResourceTransition: %v,
+		anyContainerTransition: %v,
+		blockedByOrderingDependencies: %v",
+		anyResourceTransition, anyContainerTransition, blockedByOrderingDependencies,
+		logger.Fields{
+			field.TaskID: mtask.GetID(),
+		})
+	)
 
 	// If no transitions happened and we aren't blocked by ordering dependencies, then we are possibly in a state where
 	// its impossible for containers to move forward. We will do an additional check to see if we are waiting for ACS
